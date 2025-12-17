@@ -1,9 +1,23 @@
+# ==============================================================================
+# Script Name: compression_analyzer.py
+# Description: Main entry point for the Image Compression Analysis Tool.
+#              Orchestrates compression, analysis, and report generation.
+# Usage:       python compression_analyzer.py <image_path> [options]
+# ==============================================================================
+
 import argparse
 import os
 import logging
 import datetime
 import shutil
 import json
+import sys
+
+# Ensure libs can be imported if running from root or scripts dir
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 from libs.compressor import run_compressions
 from libs.analyzer import analyze_results
 from libs.reporter import generate_report
@@ -95,7 +109,6 @@ def main():
         os.makedirs(d, exist_ok=True)
 
     # Copy original using its ACTUAL filename, not "original.ext"
-    # This ensures compressor generates "filename_qXX.webp" instead of "original_qXX.webp"
     original_copy = os.path.join(dirs["images"], filename)
     shutil.copy(args.image, original_copy)
 

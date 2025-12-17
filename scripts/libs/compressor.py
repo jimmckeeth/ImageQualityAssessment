@@ -1,6 +1,14 @@
+# ==============================================================================
+# Script Name: compressor.py
+# Description: Helper module for generating compressed image variants.
+#              Wraps 'cwebp' and ImageMagick conversion tools.
+# Note:        This is a library file. Do not run directly.
+# ==============================================================================
+
 import subprocess
 import os
 import logging
+import sys
 
 logger = logging.getLogger("Compressor")
 
@@ -79,3 +87,12 @@ def run_compressions(input_path, output_dir, formats, steps):
                     logger.error(f"Failed to compress {output_name}: {e}")
 
     return generated_files
+
+# ==============================================================================
+# Execution Guard
+# ==============================================================================
+if __name__ == "__main__":
+    print("\n[!] This is a library file and cannot be run directly.")
+    print(f"    Please run the main script instead:\n")
+    print(f"    python scripts/compression_analyzer.py <image_path>\n")
+    sys.exit(1)
