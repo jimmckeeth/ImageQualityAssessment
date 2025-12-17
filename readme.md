@@ -1,6 +1,6 @@
 # Image Compression Analyzer
 
-A Python toolset to generate, measure, and visualize image compression trade-offs between formats (WebP, JPEG) using cwebp and ImageMagick.
+A tools to generate, measure, and visualize image compression trade-offs between formats (WebP, JPEG) using cwebp and ImageMagick.
 
 ## Prerequisites
 
