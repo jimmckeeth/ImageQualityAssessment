@@ -248,8 +248,7 @@ For reproducible research, a Docker container is the ideal delivery mechanism.
 
 **Dockerfile:**
 
-Dockerfile
-
+```Dockerfile
 FROM python:3.9\-slim-bullseye
 
 \# Install system dependencies and build tools  
@@ -273,6 +272,7 @@ WORKDIR /analysis
 COPY compression_analyzer.py.
 
 ENTRYPOINT \["python", "compression_analyzer.py"\]
+```
 
 ## **8\. Conclusions and Future Outlook**
 
