@@ -1,23 +1,36 @@
-FROM python:3.9\-slim-bullseye
+FROM python:3.9-slim-bullseye
 
-# Install system dependencies and build tools  
-RUN apt-get update && apt-get install \-y \\  
- wget build-essential cmake git \\  
- libjpeg-dev libpng-dev libtiff-dev \\  
- libwebp-dev webp libheif-dev libjxl-dev
+# Install system dependencies and build tools
+# We need these to compile ImageMagick with full delegate support (WebP, HEIC, JXL)
+RUN apt-get update && apt-get install -y \
+    wget build-essential cmake git \
+    libjpeg-dev libpng-dev libtiff-dev \
+    libwebp-dev webp libheif-dev libjxl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Compile ImageMagick 7 Source  
-RUN wget <https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.1-30.tar.gz> && \\  
- tar xzf 7.1.1-30.tar.gz && \\  
- cd ImageMagick-7.1.1-30 && \\  
- ./configure \--with-heic=yes \--with-jxl=yes \--with-webp=yes && \\  
- make \-j4 && make install && ldconfig
+# Compile ImageMagick 7 Source
+# Standard apt packages often lack the newest delegates or HDRI support required for this tool
+RUN wget https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.1-30.tar.gz && \
+    tar xzf 7.1.1-30.tar.gz && \
+    cd ImageMagick-7.1.1-30 && \
+    ./configure --with-heic=yes --with-jxl=yes --with-webp=yes --enable-hdri=yes && \
+    make -j$(nproc) && make install && ldconfig && \
+    cd .. && rm -rf ImageMagick* 7.1.1-30.tar.gz
 
-# Install Python plotting lib  
+# Install Python plotting lib
 RUN pip install matplotlib
 
-# Set up working directory  
-WORKDIR /analysis  
-COPY compression_analyzer.py.
+# Set up working directory
+WORKDIR /app
 
-ENTRYPOINT \["python", "compression_analyzer.py"\]
+# Copy the scripts folder into the container
+# Assumes build context is the project root
+COPY scripts/ /app/scripts/
+COPY scripts/config.json /app/scripts/
+
+# Create a volume mount point for analysis
+WORKDIR /analysis
+
+# Entry point runs the script from the /app directory
+# We use 'python /app/scripts/compression_analyzer.py' so users can mount their pwd to /analysis
+ENTRYPOINT ["python", "/app/scripts/compression_analyzer.py"]
