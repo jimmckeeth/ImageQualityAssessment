@@ -22,7 +22,7 @@ A Python toolset to generate, measure, and visualize image compression trade-off
 
 ### Linux (Debian/Ubuntu)
 
-```
+```bash
 sudo apt-get update
 sudo apt-get install webp imagemagick python3-pip
 pip3 install matplotlib
@@ -31,7 +31,7 @@ pip3 install matplotlib
 
 ### macOS
 
-```
+```bash
 brew install webp imagemagick
 pip3 install matplotlib
 
@@ -43,7 +43,7 @@ If you prefer not to install dependencies locally, you can use the included Dock
 
 1. **Build the Image:**
 
-   ```
+   ```bash
    docker build -t img-analyzer -f scripts/installs/dockerfile .
    
    ```
@@ -51,7 +51,7 @@ If you prefer not to install dependencies locally, you can use the included Dock
 2. **Run the Analyzer:**
    Map your local folder containing images to `/analysis` inside the container.
 
-   ```
+   ```bash
    # Linux/Mac
    docker run --rm -v $(pwd):/analysis img-analyzer your-image.jpg --formats webp jpeg
    
@@ -66,7 +66,7 @@ If you prefer not to install dependencies locally, you can use the included Dock
 
 2. Run the analyzer:
 
-```shell
+```bash
 python scripts/compression_analyzer.py photo.jpg --steps 10 --formats webp jpeg
 
 ```
