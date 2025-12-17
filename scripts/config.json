@@ -1,6 +1,6 @@
 {
     "steps": 3,
-    "formats": ["jpeg"],
+    "formats": ["jpeg", "webp", "png"],
     "report_root": "reports",
     "verbosity": 1
 }

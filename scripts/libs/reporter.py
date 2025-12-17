@@ -12,20 +12,43 @@ import json
 import sys
 import matplotlib.pyplot as plt
 
-# Ensure relative imports work if file is checked by IDEs, though main script handles path
 try:
     from libs.html_templates import HTML_HEAD, HTML_ROW, HTML_FOOTER
 except ImportError:
-    # Fallback if accessed directly (though the guard block handles the user experience)
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from libs.html_templates import HTML_HEAD, HTML_ROW, HTML_FOOTER
 
 logger = logging.getLogger("Reporter")
 
+METRIC_INFO = {
+    "PSNR": {
+        "name": "Peak Signal-to-Noise Ratio",
+        "desc": "Approximation to human perception of reconstruction quality. Higher is better.",
+        "link": "https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio"
+    },
+    "SSIM": {
+        "name": "Structural Similarity",
+        "desc": "Perceptual metric that quantifies image quality degradation caused by processing. Higher is better (Max 1.0).",
+        "link": "https://en.wikipedia.org/wiki/Structural_similarity"
+    },
+    "RMSE": {
+        "name": "Root Mean Squared Error",
+        "desc": "Measure of the differences between values predicted by a model or an estimator and the values observed. Lower is better.",
+        "link": "https://en.wikipedia.org/wiki/Root-mean-square_deviation"
+    },
+    "MAE": {
+        "name": "Mean Absolute Error",
+        "desc": "Average of absolute errors between the original and compressed image. Lower is better.",
+        "link": "https://en.wikipedia.org/wiki/Mean_absolute_error"
+    },
+    "NCC": {
+        "name": "Normalized Cross Correlation",
+        "desc": "Measure of similarity of two waveforms as a function of a time-lag applied to one of them. Closer to 1.0 is better.",
+        "link": "https://en.wikipedia.org/wiki/Cross-correlation"
+    }
+}
+
 def generate_report(original_image, csv_path, report_dir, root_dir):
-    """
-    Creates SVG graphs and an HTML report.
-    """
     graph_dir = os.path.join(report_dir, "graphs")
     os.makedirs(graph_dir, exist_ok=True)
     
@@ -36,7 +59,6 @@ def generate_report(original_image, csv_path, report_dir, root_dir):
         reader = csv.DictReader(f)
         headers = reader.fieldnames
         for row in reader:
-            # Convert known numeric types
             for key in row:
                 if key not in ['filename', 'format', 'params', 'relative_path', 'diff_path', 'details']:
                     try:
@@ -46,14 +68,11 @@ def generate_report(original_image, csv_path, report_dir, root_dir):
             row['quality'] = int(row['quality'])
             data.append(row)
 
-    # 1. Generate Graphs for all metrics
     metric_cols = [h for h in headers if h not in [
         'filename', 'format', 'quality', 'params', 'relative_path', 'diff_path', 'details', 'size_kb'
     ]]
     
     generate_graphs(data, graph_dir, metric_cols)
-    
-    # 2. Generate HTML
     generate_html(original_image, data, report_dir, root_dir, metric_cols)
 
 def generate_graphs(data, graph_dir, metric_cols):
@@ -66,14 +85,12 @@ def generate_graphs(data, graph_dir, metric_cols):
             metric_groups[base] = []
         metric_groups[base].append(col)
 
-    # 1. Standard Size vs Quality
     create_chart(
         data, formats, "quality", "size_kb", 
         "Quality Setting vs File Size", "Quality", "Size (KB)", 
         os.path.join(graph_dir, "size_vs_quality.svg")
     )
 
-    # 2. Charts for each Metric Group
     for group_name, cols in metric_groups.items():
         if group_name in cols:
             create_chart(
@@ -89,7 +106,7 @@ def generate_graphs(data, graph_dir, metric_cols):
         )
 
 def create_chart(data, formats, x_key, y_key, title, xlabel, ylabel, path):
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 6))
     for fmt in formats:
         subset = sorted([d for d in data if d['format'] == fmt], key=lambda x: x[x_key])
         x_vals = [d[x_key] for d in subset]
@@ -106,7 +123,7 @@ def create_chart(data, formats, x_key, y_key, title, xlabel, ylabel, path):
     plt.close()
 
 def create_multi_metric_chart(data, formats, x_key, y_keys, title, xlabel, ylabel, path):
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 6))
     
     styles = {'Red': 'r', 'Green': 'g', 'Blue': 'b', 'Alpha': 'c', 'All': 'k'}
     linestyles = {'webp': '-', 'jpeg': '--', 'png': ':'}
@@ -147,12 +164,23 @@ def generate_html(original_path, data, report_dir, root_dir, metric_cols):
     
     metric_names = sorted(list(set([m.split('-')[0] for m in metric_cols])))
     
+    explanations_html = ""
+    for m in metric_names:
+        info = METRIC_INFO.get(m, {"name": m, "desc": "No description available.", "link": "#"})
+        explanations_html += f"""
+        <div class="metric-card">
+            <h4>{info['name']} ({m})</h4>
+            <p>{info['desc']}</p>
+            <a href="{info['link']}" target="_blank">Learn More &rarr;</a>
+        </div>
+        """
+
     graphs_html = ""
-    graphs_html += f'<div class="graph-box"><h3>Size vs Quality</h3><img src="graphs/size_vs_quality.svg"></div>'
+    graphs_html += f'<div class="graph-box"><h3>Size vs Quality</h3><img src="graphs/size_vs_quality.svg" data-caption="Chart: File Size vs Quality Setting"></div>'
     
     for m in metric_names:
-        graphs_html += f'<div class="graph-box"><h3>{m} Efficiency</h3><img src="graphs/{m}_efficiency.svg"></div>'
-        graphs_html += f'<div class="graph-box"><h3>{m} Channels</h3><img src="graphs/{m}_channels.svg"></div>'
+        graphs_html += f'<div class="graph-box"><h3>{m} Efficiency</h3><img src="graphs/{m}_efficiency.svg" data-caption="Chart: {m} Efficiency (vs Size)"></div>'
+        graphs_html += f'<div class="graph-box"><h3>{m} Channels</h3><img src="graphs/{m}_channels.svg" data-caption="Chart: {m} Channel Breakdown"></div>'
 
     rows_html = ""
     for row in data:
@@ -196,14 +224,15 @@ def generate_html(original_path, data, report_dir, root_dir, metric_cols):
     </div>
     """
 
-    full_html = HTML_HEAD.format(nav_links="", summary=summary_html, graphs=graphs_html) + rows_html + HTML_FOOTER
+    full_html = HTML_HEAD.format(
+        summary=summary_html, 
+        metric_explanations=explanations_html, 
+        graphs=graphs_html
+    ) + rows_html + HTML_FOOTER
     
     with open(os.path.join(report_dir, "index.html"), "w") as f:
         f.write(full_html)
 
-# ==============================================================================
-# Execution Guard
-# ==============================================================================
 if __name__ == "__main__":
     print("\n[!] This is a library file and cannot be run directly.")
     print(f"    Please run the main script instead:\n")
