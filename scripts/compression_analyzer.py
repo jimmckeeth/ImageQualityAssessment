@@ -3,9 +3,9 @@ import os
 import logging
 import datetime
 import shutil
-from script.compressor import run_compressions
-from script.analyzer import analyze_results
-from script.reporter import generate_report
+from libs.compressor import run_compressions
+from libs.analyzer import analyze_results
+from libs.reporter import generate_report
 
 def setup_logging(verbosity):
     level = logging.WARNING

@@ -2,7 +2,7 @@ import os
 import csv
 import logging
 import matplotlib.pyplot as plt
-from html_templates import HTML_HEAD, HTML_ROW, HTML_FOOTER
+from libs.html_templates import HTML_HEAD, HTML_ROW, HTML_FOOTER
 
 logger = logging.getLogger("Reporter")
 
