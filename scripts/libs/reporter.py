@@ -10,7 +10,9 @@ def generate_report(original_image, csv_path, report_dir, root_dir):
     """
     Creates graphs and an HTML report.
     """
-    os.makedirs(os.path.join(report_dir, "graphs"), exist_ok=True)
+    # Ensure graph directory exists inside the report folder
+    graph_dir = os.path.join(report_dir, "graphs")
+    os.makedirs(graph_dir, exist_ok=True)
     
     data = []
     with open(csv_path, 'r') as f:
@@ -24,7 +26,8 @@ def generate_report(original_image, csv_path, report_dir, root_dir):
             data.append(row)
 
     # 1. Generate Graphs
-    generate_graphs(data, os.path.join(report_dir, "graphs"))
+    # We pass the graph_dir which is now correctly located
+    generate_graphs(data, graph_dir)
     
     # 2. Generate HTML
     generate_html(original_image, data, report_dir, root_dir)
@@ -65,24 +68,44 @@ def generate_graphs(data, graph_dir):
     plt.savefig(os.path.join(graph_dir, "ssim_vs_size.png"))
     plt.close()
 
+def get_rel_path(target_path, start_path):
+    """Safe wrapper for relpath that handles directory traversal"""
+    try:
+        rel = os.path.relpath(target_path, start_path)
+        return rel
+    except ValueError:
+        return target_path
+
 def generate_html(original_path, data, report_dir, root_dir):
-    # Calculate relative paths for HTML
-    # We are in /root/report/, images are in /root/images
+    """
+    Generates the HTML report.
+    report_dir: Where index.html will be saved.
+    root_dir: The base directory of the run (where images/ and diffs/ are).
+    """
     
     # Sort data by quality descending
     data.sort(key=lambda x: (x['format'], -x['quality']))
 
-    # Relative path to original image from report dir
-    # original_path is absolute or relative to run script. 
-    # Let's rely on the structure: root/images/img.ext
-    # report is root/report/
-    rel_orig = os.path.join("../images", os.path.basename(original_path))
-
+    # Absolute paths for calculations
+    abs_report_dir = os.path.abspath(report_dir)
+    abs_root_dir = os.path.abspath(root_dir)
+    
     rows_html = ""
     for row in data:
-        # adjust paths from CSV (which are relative to root) to be relative to report folder
-        img_rel = os.path.join("..", row['relative_path'])
-        diff_rel = os.path.join("..", row['diff_path'])
+        # The CSV stores 'relative_path' from the project root (e.g. "images/file.webp")
+        # We need to construct the full path, then find the relative path from the HTML file
+        
+        # 1. Image Path
+        abs_img_path = os.path.join(abs_root_dir, row['relative_path'])
+        img_rel = get_rel_path(abs_img_path, abs_report_dir)
+        
+        # 2. Diff Path
+        # Handle cases where diff generation might have failed
+        if row['diff_path']:
+            abs_diff_path = os.path.join(abs_root_dir, row['diff_path'])
+            diff_rel = get_rel_path(abs_diff_path, abs_report_dir)
+        else:
+            diff_rel = ""
         
         rows_html += HTML_ROW.format(
             filename=row['filename'],
