@@ -81,51 +81,87 @@ def generate_graphs(data, graph_dir, metric_cols):
     metric_groups = {}
     for col in metric_cols:
         base = col.split('-')[0]
-        if base not in metric_groups:
-            metric_groups[base] = []
-        metric_groups[base].append(col)
+        base_upper = base.upper() 
+        if base_upper not in metric_groups:
+            metric_groups[base_upper] = []
+        metric_groups[base_upper].append(col)
 
-    create_chart(
-        data, formats, "quality", "size_kb", 
-        "Quality Setting vs File Size", "Quality", "Size (KB)", 
-        os.path.join(graph_dir, "size_vs_quality.svg")
-    )
-
-    for group_name, cols in metric_groups.items():
-        if group_name in cols:
-            create_chart(
-                data, formats, "size_kb", group_name,
-                f"{group_name} Efficiency (vs Size)", "Size (KB)", group_name,
-                os.path.join(graph_dir, f"{group_name}_efficiency.svg")
-            )
-        
-        create_multi_metric_chart(
-            data, formats, "quality", cols,
-            f"{group_name} Detail (Channels)", "Quality", group_name,
-            os.path.join(graph_dir, f"{group_name}_channels.svg")
+    # Helper to generate both light and dark versions
+    def make_charts(x_key, y_key, title, xlabel, ylabel, filename_base, group_cols=None):
+        # Light Mode (Default)
+        create_chart_variant(
+            data, formats, x_key, y_key, title, xlabel, ylabel, 
+            os.path.join(graph_dir, f"{filename_base}.svg"),
+            dark_mode=False, group_cols=group_cols
+        )
+        # Dark Mode
+        create_chart_variant(
+            data, formats, x_key, y_key, title, xlabel, ylabel, 
+            os.path.join(graph_dir, f"{filename_base}_dark.svg"),
+            dark_mode=True, group_cols=group_cols
         )
 
-def create_chart(data, formats, x_key, y_key, title, xlabel, ylabel, path):
-    plt.figure(figsize=(12, 6))
-    for fmt in formats:
-        subset = sorted([d for d in data if d['format'] == fmt], key=lambda x: x[x_key])
-        x_vals = [d[x_key] for d in subset]
-        y_vals = [d[y_key] for d in subset]
-        plt.plot(x_vals, y_vals, marker='o', label=fmt)
-    
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True, which="both", linestyle='--', alpha=0.7)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(path, format='svg')
-    plt.close()
+    # 1. Size vs Quality
+    make_charts("quality", "size_kb", "Quality Setting vs File Size", "Quality", "Size (KB)", "size_vs_quality")
 
-def create_multi_metric_chart(data, formats, x_key, y_keys, title, xlabel, ylabel, path):
+    # 2. Metric Groups
+    for group_name, cols in metric_groups.items():
+        # Efficiency
+        main_col = next((c for c in cols if c.upper() == group_name), None)
+        if main_col:
+            make_charts("size_kb", main_col, f"{group_name} Efficiency (vs Size)", "Size (KB)", group_name, f"{group_name}_efficiency")
+        
+        # Channels
+        make_charts("quality", None, f"{group_name} Detail (Channels)", "Quality", group_name, f"{group_name}_channels", group_cols=cols)
+
+def create_chart_variant(data, formats, x_key, y_key, title, xlabel, ylabel, path, dark_mode=False, group_cols=None):
+    # Style Config
+    bg_color = '#2d3748' if dark_mode else '#ffffff'
+    text_color = '#e2e8f0' if dark_mode else '#1a202c'
+    grid_color = '#4a5568' if dark_mode else '#e2e8f0'
+    
     plt.figure(figsize=(12, 6))
     
-    styles = {'Red': 'r', 'Green': 'g', 'Blue': 'b', 'Alpha': 'c', 'All': 'k'}
+    # Set global style context
+    with plt.rc_context({
+        'axes.facecolor': bg_color,
+        'figure.facecolor': bg_color,
+        'text.color': text_color,
+        'axes.labelcolor': text_color,
+        'xtick.color': text_color,
+        'ytick.color': text_color,
+        'axes.edgecolor': grid_color
+    }):
+        if group_cols:
+            # Multi-channel chart
+            create_multi_metric_plot(data, formats, x_key, group_cols)
+        else:
+            # Single metric plot
+            for fmt in formats:
+                subset = sorted([d for d in data if d['format'] == fmt], key=lambda x: x[x_key])
+                x_vals = [d[x_key] for d in subset]
+                y_vals = [d.get(y_key, 0) for d in subset]
+                plt.plot(x_vals, y_vals, marker='o', label=fmt)
+
+        plt.title(title, color=text_color)
+        plt.xlabel(xlabel, color=text_color)
+        plt.ylabel(ylabel, color=text_color)
+        plt.grid(True, which="both", linestyle='--', alpha=0.5, color=grid_color)
+        
+        # Legend styling
+        legend = plt.legend()
+        frame = legend.get_frame()
+        frame.set_facecolor(bg_color)
+        frame.set_edgecolor(grid_color)
+        for text in legend.get_texts():
+            text.set_color(text_color)
+
+        plt.tight_layout()
+        plt.savefig(path, format='svg', transparent=False)
+        plt.close()
+
+def create_multi_metric_plot(data, formats, x_key, y_keys):
+    styles = {'Red': 'r', 'Green': 'g', 'Blue': 'b', 'Alpha': 'c', 'All': 'gray'}
     linestyles = {'webp': '-', 'jpeg': '--', 'png': ':'}
     
     for fmt in formats:
@@ -133,8 +169,11 @@ def create_multi_metric_chart(data, formats, x_key, y_keys, title, xlabel, ylabe
         x_vals = [d[x_key] for d in subset]
         
         for y_key in y_keys:
-            channel = y_key.split('-')[1] if '-' in y_key else "All"
-            color = styles.get(channel, 'k')
+            parts = y_key.split('-')
+            channel = parts[1] if len(parts) > 1 else "All"
+            
+            # Map "gray" to white in dark mode for visibility if needed, but let's stick to 'gray' or 'cyan'
+            color = styles.get(channel, 'gray')
             ls = linestyles.get(fmt, '-')
             
             y_vals = [d.get(y_key, 0) for d in subset]
@@ -142,14 +181,6 @@ def create_multi_metric_chart(data, formats, x_key, y_keys, title, xlabel, ylabe
             
             plt.plot(x_vals, y_vals, marker='.', linestyle=ls, color=color, label=label, alpha=0.8)
 
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
-    plt.savefig(path, format='svg')
-    plt.close()
 
 def get_rel_path(target_path, start_path):
     try:
@@ -162,7 +193,7 @@ def generate_html(original_path, data, report_dir, root_dir, metric_cols):
     abs_report_dir = os.path.abspath(report_dir)
     abs_root_dir = os.path.abspath(root_dir)
     
-    metric_names = sorted(list(set([m.split('-')[0] for m in metric_cols])))
+    metric_names = sorted(list(set([m.split('-')[0].upper() for m in metric_cols])))
     
     explanations_html = ""
     for m in metric_names:
@@ -176,14 +207,27 @@ def generate_html(original_path, data, report_dir, root_dir, metric_cols):
         """
 
     graphs_html = ""
-    graphs_html += f'<div class="graph-box"><h3>Size vs Quality</h3><img src="graphs/size_vs_quality.svg" data-caption="Chart: File Size vs Quality Setting"></div>'
+    # Add Size vs Quality (Light and Dark)
+    graphs_html += f"""
+    <div class="graph-box">
+        <h3>Size vs Quality</h3>
+        <img src="graphs/size_vs_quality.svg" data-dark-src="graphs/size_vs_quality_dark.svg" data-caption="Chart: File Size vs Quality Setting">
+    </div>"""
     
     for m in metric_names:
-        graphs_html += f'<div class="graph-box"><h3>{m} Efficiency</h3><img src="graphs/{m}_efficiency.svg" data-caption="Chart: {m} Efficiency (vs Size)"></div>'
-        graphs_html += f'<div class="graph-box"><h3>{m} Channels</h3><img src="graphs/{m}_channels.svg" data-caption="Chart: {m} Channel Breakdown"></div>'
+        graphs_html += f"""
+        <div class="graph-box">
+            <h3>{m} Efficiency</h3>
+            <img src="graphs/{m}_efficiency.svg" data-dark-src="graphs/{m}_efficiency_dark.svg" data-caption="Chart: {m} Efficiency (vs Size)">
+        </div>"""
+        graphs_html += f"""
+        <div class="graph-box">
+            <h3>{m} Channels</h3>
+            <img src="graphs/{m}_channels.svg" data-dark-src="graphs/{m}_channels_dark.svg" data-caption="Chart: {m} Channel Breakdown">
+        </div>"""
 
     rows_html = ""
-    for row in data:
+    for idx, row in enumerate(data):
         abs_img_path = os.path.join(abs_root_dir, row['relative_path'])
         img_rel = get_rel_path(abs_img_path, abs_report_dir)
         
@@ -199,20 +243,27 @@ def generate_html(original_path, data, report_dir, root_dir, metric_cols):
             details_str = "N/A"
 
         metrics_html = ""
-        for m in metric_names:
-            val = row.get(m, 0)
-            metrics_html += f"<strong>{m}:</strong> {val:.2f} "
+        for k, v in row.items():
+            k_upper = k.split('-')[0].upper()
+            if k_upper in metric_names and isinstance(v, (int, float)):
+                if '-' not in k:
+                    metrics_html += f"<strong>{k.upper()}:</strong> {v:.2f} "
 
-        rows_html += HTML_ROW.format(
-            filename=row['filename'],
-            format=row['format'],
-            quality=row['quality'],
-            size=row['size_kb'],
-            details=details_str,
-            metrics=metrics_html,
-            img_src=img_rel,
-            diff_src=diff_rel
-        )
+        try:
+            rows_html += HTML_ROW.format(
+                index=idx, # Passed for JS row tracking
+                filename=row['filename'],
+                format=row['format'],
+                quality=row['quality'],
+                size=row['size_kb'],
+                details=details_str,
+                metrics=metrics_html,
+                img_src=img_rel,
+                diff_src=diff_rel
+            )
+        except KeyError as e:
+            logger.error(f"HTML Template mismatch: Missing key {e}")
+            rows_html += f"<div style='color:red'>Template Error: Missing {e}</div>"
 
     summary_html = f"""
     <div class="summary-box">

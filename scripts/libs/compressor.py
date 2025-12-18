@@ -33,7 +33,11 @@ def run_compressions(input_path, output_dir, formats, steps):
         if fmt == "webp":
             # WebP Loop
             for q in qualities:
-                output_name = f"{base_name}_q{q}.webp"
+                # Padding quality to 3 digits (or 2 if max is 99, but 100 needs 3 order)
+                # Actually, user asked for "two digits", so q05, q10. 
+                # If 100, it will be q100 (3 digits). This sorts correctly: 05, 10, ... 100.
+                q_str = f"{q:02d}" 
+                output_name = f"{base_name}_q{q_str}.webp"
                 output_path = os.path.join(output_dir, output_name)
                 
                 cmd = ["cwebp", "-q", str(q), input_path, "-o", output_path]
@@ -68,7 +72,8 @@ def run_compressions(input_path, output_dir, formats, steps):
         elif fmt in ["jpg", "jpeg"]:
             # JPEG Loop (using ImageMagick)
             for q in qualities:
-                output_name = f"{base_name}_q{q}.jpg"
+                q_str = f"{q:02d}"
+                output_name = f"{base_name}_q{q_str}.jpg"
                 output_path = os.path.join(output_dir, output_name)
                 
                 # Magick command
